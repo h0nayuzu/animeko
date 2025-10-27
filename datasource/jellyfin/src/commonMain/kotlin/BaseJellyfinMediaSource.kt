@@ -79,7 +79,7 @@ abstract class BaseJellyfinMediaSource(
                         else -> emptyFlow()
                     }
                 }
-                .filter { (it.Type == "Episode" || it.Type == "Movie") && it.CanDownload }
+                .filter { (it.Type == "Episode" || it.Type == "Movie")}
                 .toList()
                 .distinctBy { it.Id }
                 .mapNotNull { item ->
