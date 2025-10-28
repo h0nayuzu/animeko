@@ -71,15 +71,26 @@ abstract class BaseJellyfinMediaSource(
                     val resp = doSearch(subjectName)
                     resp.Items.asFlow()
                 }
-                .flatMapMerge {
-                    when (it.Type) {
-                        "Season" -> doSearch(parentId = it.Id).Items.asFlow()
-                        "Episode" -> flowOf(it)
-                        "Movie" -> flowOf(it)
+                .flatMapMerge { item ->
+                    when (item.Type) {
+                        "Series" -> {
+                            // 获取该系列的所有季
+                            doSearch(parentId = item.Id).Items.asFlow()
+                                .flatMapMerge { season ->
+                                    // 获取该季的所有集
+                                    doSearch(parentId = season.Id).Items.asFlow()
+                                }
+                        }
+                        "Season" -> {
+                            // 获取该季的所有集
+                            doSearch(parentId = item.Id).Items.asFlow()
+                        }
+                        "Episode" -> flowOf(item)
+                        "Movie" -> flowOf(item)
                         else -> emptyFlow()
                     }
                 }
-                .filter { (it.Type == "Episode" || it.Type == "Movie")}
+                .filter { it.Type == "Episode" || it.Type == "Movie" }
                 .toList()
                 .distinctBy { it.Id }
                 .mapNotNull { item ->
@@ -112,7 +123,9 @@ abstract class BaseJellyfinMediaSource(
                             publishedTime = 0,
                             properties = MediaProperties(
                                 // Note: 这里我们 fallback 使用请求的名称, 这样可以在缺少信息时绝对通过后续的过滤, 避免资源被排除. 但这可能会导致有不满足的资源被匹配. 如果未来有问题再考虑. See also #1806.
-                                subjectName = item.SeasonName?.takeIf { it.isNotBlank() } ?: query.subjectNameCN,
+                                subjectName = item.SeriesName?.takeIf { it.isNotBlank() } 
+                                    ?: item.SeasonName?.takeIf { it.isNotBlank() } 
+                                    ?: query.subjectNameCN,
                                 episodeName = item.Name,
                                 subtitleLanguageIds = listOf("CHS"),
                                 resolution = "1080P",
@@ -205,6 +218,7 @@ private data class MediaStream(
 private data class Item(
     val Name: String,
     val SeasonName: String? = null,
+    val SeriesName: String? = null,
     val Id: String,
     val OriginalTitle: String? = null, // 日文
     val IndexNumber: Int? = null,
